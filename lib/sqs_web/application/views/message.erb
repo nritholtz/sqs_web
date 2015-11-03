@@ -1,0 +1,36 @@
+<li class="job">
+  <dl>
+    <dt>ID</dt>
+    <dd>
+      <a name="<%= message.message_id %>"></a>
+      <a href="#<%= message.message_id %>"><%=h message.message_id %></a>
+      <div class="controls">
+        <form action="<%= u("remove/#{queue[:name]}/#{message.message_id}") %>" method="post"><%= csrf_token_tag %><input type="submit" value="Remove"></input></form>
+      </div>
+    </dd>
+    <dt>Receive Count</dt>
+    <dd><%=h message.attributes["ApproximateReceiveCount"] %></dd>
+    <dt>Queue Name</dt>
+    <dd><%=h queue[:name] %></dd>
+    <dt>Queue URL</dt>
+    <dd><%=h queue[:url] %></dd>
+    <dt>Message Body</dt>
+    <dd>
+    <pre><%=h message.body %></pre>
+    </dd>
+    <dt>Raw Message</dt>
+    <dd>
+      <div class="backtrace">
+        <pre><%=h message.inspect.to_yaml[0..100] + '...' %></pre>
+      </div>
+      <a class="backtrace" href="#">Toggle full message</a>
+      <div class="backtrace full hide">
+        <pre><%=h message.inspect.to_yaml %></pre>
+      </div>
+    </dd>
+    <dt>Enqueued At</dt>
+    <dd class="time">
+      <%=h Time.at(message.attributes["SentTimestamp"].to_i/1000).rfc822 %>
+    </dd>
+  </dl>
+</li>

@@ -1,0 +1,13 @@
+<h1>Enqueued</h1>
+<p class="sub">
+  The list below contains all messages currently visible in the SQS queues.
+</p>
+<p><%=h flash.message %></p>
+<p class="sub">
+  <%= "Showing #{@messages.count} enqueued messages." %>
+</p>
+<ul class="job">
+  <% @messages.each do |message| %>
+    <%= partial :message, {:message => message[:message], :queue => message[:queue]} %>
+  <% end %>
+</ul>
