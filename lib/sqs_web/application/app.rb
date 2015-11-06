@@ -256,8 +256,8 @@ class SqsWeb < Sinatra::Base
 
     # assume credentials based authentication
     credentials = Aws::Credentials.new(
-      aws_options.delete(:access_key_id),
-      aws_options.delete(:secret_access_key))
+      aws_options[:access_key_id],
+      aws_options[:secret_access_key])
 
     # but only if the configuration options have valid values
     aws_options = aws_options.merge(credentials: credentials) if credentials.set?

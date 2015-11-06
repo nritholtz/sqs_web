@@ -9,7 +9,7 @@ RSpec.describe "Mounted in Rails Application", :sqs do
 
   QUEUE_NAME = "test-source"
 
-  let(:sqs) { Aws::SQS::Client.new(region: 'us-east-1') }
+  let(:sqs) { Aws::SQS::Client.new(region: "us-east-1", credentials: Aws::Credentials.new("fake", "fake")) }
 
   let(:queue_url) { sqs.get_queue_url(queue_name: QUEUE_NAME).queue_url }
 
