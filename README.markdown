@@ -1,19 +1,21 @@
 sqs_web
 ===============
+[![Build Status](https://travis-ci.org/nritholtz/sqs_web.svg?branch=master)](https://travis-ci.org/nritholtz/sqs_web)
+[![Code Climate](https://codeclimate.com/github/nritholtz/sqs_web.png)](https://codeclimate.com/github/nritholtz/sqs_web)
 
 A [delayed_job_web](https://github.com/ejschmitt/delayed_job_web) inspired (read: stolen) interface for SQS.
 This gem was written to work anchored within rails 3 and 4 applications.
 
 Some features:
 
-* Easily view jobs enqueued in a SQS queue
+* Easily view messages visible and in-flight in your configured SQS queues
 * Move any single enqueued message, or all enqueued messages, from a DLQ to the corresponding active queue
-* Remove an enqueued message, or easily remove all enqueued messages
+* Remove an enqueued message, or easily remove all enqueued messages from a DLQ
 * View overview stats for the queues
 
 The interface:
 
-![Screen shot](https://www.dropbox.com/s/b9lqwehln9skywe/sqs_web.png?dl=1)
+![Screen shot](https://www.dropbox.com/s/j14s0aqthj8w3d2/sqs_web_dashboard.png?dl=1)
 
 
 Quick Start For Rails 3 and 4 Applications
@@ -56,12 +58,15 @@ end
 - `secret_access_key` : AWS Secret Access Key. If not set will default to environment variable `AWS_SECRET_ACCESS_KEY` or instance profile credentials.
 - `region`: AWS region for the SQS queue. If not set will default to environment variable `AWS_REGION` or else to `us-east-1`.
 
-`SqsWeb.options[:queues]` supports an array of strings for the SQS queue names you would like registered with the plugin.
+`SqsWeb.options[:queues]` supports an array of strings for the SQS queue names.
+```ruby
+SqsWeb.options[:queues] =  ["TestSourceQueue", "TestSourceQueueDLQ"]
+```
 
 ## Notes
-Currently, this was written in mind for being only used for DLQ management. The [AWS SQS Management Console](https://aws.amazon.com/blogs/aws/aws-management-console-now-supports-the-simple-queue-service-sqs/) should have most of the functionality that you would want out of the box, this plugin is **not meant as a replace for the AWS SQS Management Console**, but rather as a supplement. There are some features that are not implemented yet (e.g. moving a message from a DLQ back to the active queue), and there are some additional benefits for the management screen to live within the application.
+Currently, this was written in mind for being only used for DLQ management. The [AWS SQS Management Console](https://aws.amazon.com/blogs/aws/aws-management-console-now-supports-the-simple-queue-service-sqs/) should have most of the functionality that you would want out of the box, this plugin is **not meant as a replacement for the AWS SQS Management Console**, but rather as a supplement. There are some features that are not implemented yet (e.g. moving a message from a DLQ back to the source queue) in the AWS Console, and there are some additional benefits for the management screen to live within the application.
 
-This is not to say there are some features that may be duplicated or added to this plugin as it advances. In addition, our applications are using (Shoryuken)[https://github.com/phstc/shoryuken] which uses `message attributes` (e.g. *ApproximateReceiveCount*) that become "invalid" once you pick up the message from an active queue. There is greater freedom when managing a DLQ, since this plugin is assuming that the management console (or the AWS SQS Management Console) are the only consumers of the DLQ, which solves the complexity of these `message attributes`.
+This is not to say there are some features that may be duplicated or added to this plugin as it advances. In addition, our internal applications are using (Shoryuken)[https://github.com/phstc/shoryuken] which uses `message attributes` (e.g. *ApproximateReceiveCount*) that become "invalid" once you pick up the message from an active queue. There is greater freedom when managing a DLQ, since this plugin is assuming that the management console (or the AWS SQS Management Console) are the only consumers of the DLQ, which solves the complexity of these `message attributes`.
 
 ## Serving static assets
 
@@ -89,6 +94,11 @@ Lighty is more `X-Sendfile`, like [outlined](http://redmine.lighttpd.net/project
 
 Contributing
 ------------
+
+* To bootstrap a `fake_sqs` environment for development purposes, run the following:
+```ruby
+bundle exec ruby scripts/bootstrap_queues.rb
+```
 
 1. Fork
 2. Hack

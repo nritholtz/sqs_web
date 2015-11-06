@@ -16,19 +16,19 @@ class SqsWeb < Sinatra::Base
     end
 
     def message=(message)
-      @session[:flash] = message
+      @session[:flash_message] = message
     end
 
     def message
-      message = @session[:flash] #tmp get the value
-      @session[:flash] = nil # unset the value
+      message = @session[:flash_message] #tmp get the value
+      @session[:flash_message] = nil # unset the value
       message # display the value
     end
   end
 
   helpers do
-    def flash
-      @flash ||= FlashMessage.new(session)
+    def flash_message
+      @flash_message ||= FlashMessage.new(session)
     end
   end
 
@@ -80,14 +80,14 @@ class SqsWeb < Sinatra::Base
   def tabs
     [
       {:name => 'Overview', :path => '/overview'},
-      {:name => 'Enqueued', :path => '/enqueued'}
+      {:name => 'DLQ Console', :path => '/dlq_console'}
     ]
   end
 
   def sqs
     return @sqs if @sqs
     initialize_aws
-    @sqs = Aws::SQS::Client.new(aws_client_options)
+    @sqs = Aws::SQS::Client.new
     load_queue_urls
     @sqs
   end
@@ -105,7 +105,12 @@ class SqsWeb < Sinatra::Base
     end
   end
 
-  %w(overview enqueued).each do |page|
+  get '/overview' do
+    @stats = queue_stats
+    erb :overview
+  end
+
+  %w(dlq_console).each do |page|
     get "/#{page}" do
       @messages = sqs && messages
       erb page.to_sym
@@ -114,7 +119,7 @@ class SqsWeb < Sinatra::Base
 
   post "/remove/:queue_name/:message_id" do
     result = messages({visibility_timeout: 4, action: :delete, message_id: params[:message_id], queue_name: params[:queue_name]})
-    flash.message = "Message ID: #{params[:message_id]} in Queue #{params[:queue_name]} has already been deleted or no longer exists." if result.empty?
+    flash_message.message = "Message ID: #{params[:message_id]} in Queue #{params[:queue_name]} has already been deleted or no longer exists." if result.empty?
     redirect back
   end
 
@@ -201,11 +206,23 @@ class SqsWeb < Sinatra::Base
   # end
 
   private
+  def queue_stats
+    load_queue_urls unless @queues
+    stats_summary = {}
+    @queues.each do |queue|
+      visible = in_flight = 0
+      response = sqs.get_queue_attributes(queue_url: queue[:url], attribute_names: ["ApproximateNumberOfMessages", "ApproximateNumberOfMessagesNotVisible"]).attributes
+      visible += response["ApproximateNumberOfMessages"].to_i
+      in_flight += response["ApproximateNumberOfMessagesNotVisible"].to_i
+      stats_summary[queue[:name]] = {visible: visible, in_flight: in_flight}
+    end
+    stats_summary
+  end
 
   def messages(options={})
     messages_result = []
     load_queue_urls unless @queues
-    @queues.each do |queue|
+    @queues.select{|queue| queue[:source_url]}.each do |queue|
       eval "@poller_#{queue[:name]} ||= Aws::SQS::QueuePoller.new(queue[:url], {client: sqs, skip_delete: true, idle_timeout: 1, 
         wait_time_seconds: 1, visibility_timeout: options[:visibility_timeout] || 5})"
       Timeout::timeout(30) do
@@ -214,9 +231,9 @@ class SqsWeb < Sinatra::Base
             if options[:message_id] == message.message_id && options[:queue_name] == queue[:name]
               response = instance_variable_get("@poller_#{queue[:name]}").delete_message(message)
               if response.successful?
-                flash.message = "Message ID: #{options[:message_id]} in Queue #{options[:queue_name]} was successfully removed."
+                flash_message.message = "Message ID: #{options[:message_id]} in Queue #{options[:queue_name]} was successfully removed."
               else
-                flash.message = "Error while trying to delete Message ID: #{options[:message_id]} in Queue #{options[:queue_name]}: #{response.inspect}"
+                flash_message.message = "Error while trying to delete Message ID: #{options[:message_id]} in Queue #{options[:queue_name]}: #{response.inspect}"
               end
               messages_result << {message: message, queue: queue}
               throw :stop_polling
@@ -228,12 +245,6 @@ class SqsWeb < Sinatra::Base
       end
     end
     messages_result
-  end
-
-  def aws_client_options
-    options = {}
-    options[:endpoint] = SqsWeb.options[:aws][:endpoint] if SqsWeb.options[:aws][:endpoint]
-    options
   end
 
   def initialize_aws
@@ -252,14 +263,13 @@ class SqsWeb < Sinatra::Base
     aws_options = aws_options.merge(credentials: credentials) if credentials.set?
 
     Aws.config = aws_options
-    Aws::SQS::Client.remove_plugin(Aws::Plugins::SQSQueueUrls) if Rails.env.test?
   end
 
   def load_queue_urls
     @queues = sqs && SqsWeb.options[:queues].map do |queue_name|
-      queue_url = sqs.get_queue_url(queue_name: queue_name).queue_url
-      queue_url.gsub!('0.0.0.0', 'dockerhost') if Rails.env.test?
-      {name: queue_name, url: queue_url}
+      dlq_queue_url = sqs.get_queue_url(queue_name: queue_name).queue_url
+      source_queue_url = sqs.list_dead_letter_source_queues({queue_url: dlq_queue_url}).queue_urls.first
+      {name:  queue_name, url: dlq_queue_url, source_url: source_queue_url}
     end
   end
 

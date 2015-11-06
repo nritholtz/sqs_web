@@ -2,27 +2,16 @@
   Overview
 </h1>
 <p class="sub">
-  The list below shows an overview of visible messages in the SQS queues.
+  The list below shows an overview of messages in the SQS queues.
 </p>
 <table class="overview">
   <tr>
-    <th>Section</th>
-    <th>Count</th>
-    <th>Queue Names</th>
-    <th>Queue URLs</th>
+    <th>Queue Name</th>
+    <th>Visible Messages Count</th>
+    <th>In Flight Messages Count</th>
+    <th>Origin Queue</th>
   </tr>
-  <tr>
-    <td class="status">
-      <a href="<%= u('/enqueued') %>">Enqueued Messages</a>
-    </td>
-    <td>
-       <%= @messages.count %>
-    </td>
-    <td>
-      <%= @queues.collect{|c| c[:name]} %>
-    </td>
-    <td>
-      <%= @queues.collect{|c| c[:url]} %>
-    </td>
-  </tr>
+  <% @queues.each do |queue| %>
+    <%= partial :queue_stats, {:queue => queue, :stats => @stats[queue[:name]]} %>
+  <% end %>
 </table>

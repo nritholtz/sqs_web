@@ -8,12 +8,14 @@
         <form action="<%= u("remove/#{queue[:name]}/#{message.message_id}") %>" method="post"><%= csrf_token_tag %><input type="submit" value="Remove"></input></form>
       </div>
     </dd>
-    <dt>Receive Count</dt>
-    <dd><%=h message.attributes["ApproximateReceiveCount"] %></dd>
+    <% if message.attributes["ApproximateReceiveCount"] %>
+      <dt>Receive Count</dt>
+      <dd><%=h message.attributes["ApproximateReceiveCount"] %></dd>
+    <% end %>
     <dt>Queue Name</dt>
     <dd><%=h queue[:name] %></dd>
-    <dt>Queue URL</dt>
-    <dd><%=h queue[:url] %></dd>
+    <dt>Origin Queue</dt>
+    <dd><%=h queue[:source_url] %></dd>
     <dt>Message Body</dt>
     <dd>
     <pre><%=h message.body %></pre>

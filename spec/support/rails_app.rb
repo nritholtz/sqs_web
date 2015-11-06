@@ -1,12 +1,12 @@
 require "action_controller/railtie"
 require "logger"
-require "delayed_job_web"
+require "sqs_web"
 
 class RailsApp < Rails::Application
   config.logger = Rails.logger = Logger.new(nil)
-  config.secret_key_base = "foo"
+  config.secret_token = "a3d6cee7966878577a764ed273359d9e"
 
   routes.draw do
-    match "/delayed_job" => DelayedJobWeb, :anchor => false, via: [:get, :post]
+    match "/sqs" => SqsWeb, :anchor => false, via: [:get, :post]
   end
 end

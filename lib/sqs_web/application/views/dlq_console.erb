@@ -1,10 +1,10 @@
-<h1>Enqueued</h1>
+<h1>DLQ Console</h1>
 <p class="sub">
-  The list below contains all messages currently visible in the SQS queues.
+  The list below contains all messages currently visible in SQS DLQ queues.
 </p>
-<p><%=h flash.message %></p>
+<p><%=h flash_message.message %></p>
 <p class="sub">
-  <%= "Showing #{@messages.count} enqueued messages." %>
+  <%= "Showing #{@messages.count} visible messages." %>
 </p>
 <ul class="job">
   <% @messages.each do |message| %>

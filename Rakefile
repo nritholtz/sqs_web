@@ -1,14 +1,33 @@
 require 'bundler'
-require 'rake/testtask'
+require 'rspec/core/rake_task'
+require "tempfile"
 require 'rdoc/task'
 
-Rake::TestTask.new do |test|
-  test.libs << 'lib' << 'test'
-  test.pattern = 'test/**/test_*.rb'
-  test.verbose = true
+namespace :spec do
+  desc "Run only unit specs"
+  RSpec::Core::RakeTask.new(:unit) do |t|
+    t.pattern = "spec/unit/*"
+  end
+
+  desc "Run specs with in-memory database"
+  RSpec::Core::RakeTask.new(:memory) do |t|
+    ENV["SQS_DATABASE"] = ":memory:"
+    t.pattern = "spec/integration/*"
+  end
+
+  desc "Run specs with file database"
+  RSpec::Core::RakeTask.new(:file) do |t|
+    file = Tempfile.new(["rspec-sqs", ".yml"], encoding: "utf-8")
+    ENV["SQS_DATABASE"] = file.path
+    t.pattern = "spec/integration/*"
+  end
 end
 
-task :default => :test
+desc "Run spec suite with both in-memory and file"
+task :spec => ["spec:memory", "spec:file"]
+#task :spec => ["spec:unit", "spec:memory", "spec:file"]
+
+task :default => :spec
 
 Rake::RDocTask.new do |rdoc|
   version = File.exist?('VERSION') ? File.read('VERSION') : ""
