@@ -1,7 +1,7 @@
 sqs_web
 ===============
 [![Build Status](https://travis-ci.org/nritholtz/sqs_web.svg?branch=master)](https://travis-ci.org/nritholtz/sqs_web)
-[![Code Climate](https://codeclimate.com/github/nritholtz/sqs_web.png)](https://codeclimate.com/github/nritholtz/sqs_web)
+[![Code Climate](https://codeclimate.com/github/nritholtz/sqs_web/badges/gpa.svg)](https://codeclimate.com/github/nritholtz/sqs_web)
 [![Test Coverage](https://codeclimate.com/github/nritholtz/sqs_web/badges/coverage.svg)](https://codeclimate.com/github/nritholtz/sqs_web/coverage)
 
 A [delayed_job_web](https://github.com/ejschmitt/delayed_job_web) inspired (read: stolen) interface for SQS.

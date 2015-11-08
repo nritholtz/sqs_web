@@ -10,22 +10,6 @@ class SqsWeb < Sinatra::Base
     end
   end
 
-  class FlashMessage
-    def initialize(session)
-      @session ||= session
-    end
-
-    def message=(message)
-      @session[:flash_message] = message
-    end
-
-    def message
-      message = @session[:flash_message] #tmp get the value
-      @session[:flash_message] = nil # unset the value
-      message # display the value
-    end
-  end
-
   helpers do
     def flash_message
       @flash_message ||= FlashMessage.new(session)
@@ -110,11 +94,9 @@ class SqsWeb < Sinatra::Base
     erb :overview
   end
 
-  %w(dlq_console).each do |page|
-    get "/#{page}" do
-      @messages = sqs && messages
-      erb page.to_sym
-    end
+  get "/dlq_console" do
+    @messages = sqs && messages
+    erb :dlq_console
   end
 
   post "/remove/:queue_name/:message_id" do
@@ -122,50 +104,6 @@ class SqsWeb < Sinatra::Base
     flash_message.message = "Message ID: #{params[:message_id]} in Queue #{params[:queue_name]} has already been deleted or no longer exists." if result.empty?
     redirect back
   end
-
-  # %w(pending failed).each do |page|
-  #   post "/requeue/#{page}" do
-  #     delayed_jobs(page.to_sym, @queues).update_all(:run_at => Time.now, :failed_at => nil)
-  #     redirect back
-  #   end
-  # end
-
-  # post "/requeue/:id" do
-  #   job = delayed_job.find(params[:id])
-  #   job.update_attributes(:run_at => Time.now, :failed_at => nil)
-  #   redirect back
-  # end
-
-  # post "/reload/:id" do
-  #   job = delayed_job.find(params[:id])
-  #   job.update_attributes(:run_at => Time.now, :failed_at => nil, :locked_by => nil, :locked_at => nil, :last_error => nil, :attempts => 0)
-  #   redirect back
-  # end
-
-  # post "/failed/clear" do
-  #   delayed_jobs(:failed, @queues).delete_all
-  #   redirect u('failed')
-  # end
-
-  # def delayed_jobs(type, queues = [])
-  #   rel = delayed_job
-
-  #   rel =
-  #     case type
-  #     when :working
-  #       rel.where('locked_at IS NOT NULL')
-  #     when :failed
-  #       rel.where('last_error IS NOT NULL')
-  #     when :pending
-  #       rel.where(:attempts => 0, :locked_at => nil)
-  #     else
-  #       rel
-  #     end
-
-  #   rel = rel.where(:queue => queues) unless queues.empty?
-
-  #   rel
-  # end
 
   get "/?" do
     redirect u(:overview)
@@ -178,73 +116,54 @@ class SqsWeb < Sinatra::Base
     @partial = false
   end
 
-  # %w(overview enqueued working pending failed stats) .each do |page|
-  #   get "/#{page}.poll" do
-  #     show_for_polling(page)
-  #   end
-
-  #   get "/#{page}/:id.poll" do
-  #     show_for_polling(page)
-  #   end
-  # end
-
-  # def poll
-  #   if @polling
-  #     text = "Last Updated: #{Time.now.strftime("%H:%M:%S")}"
-  #   else
-  #     text = "<a href='#{u(request.path_info + ".poll")}' rel='poll'>Live Poll</a>"
-  #   end
-  #   "<p class='poll'>#{text}</p>"
-  # end
-
-  # def show_for_polling(page)
-  #   content_type "text/html"
-  #   @polling = true
-  #   # show(page.to_sym, false).gsub(/\s{1,}/, ' ')
-  #   @jobs = delayed_jobs(page.to_sym, @queues)
-  #   erb(page.to_sym, {:layout => false})
-  # end
-
   private
   def queue_stats
     load_queue_urls unless @queues
-    stats_summary = {}
-    @queues.each do |queue|
+    @queues.each_with_object({}) do |queue, stats_summary|
       visible = in_flight = 0
       response = sqs.get_queue_attributes(queue_url: queue[:url], attribute_names: ["ApproximateNumberOfMessages", "ApproximateNumberOfMessagesNotVisible"]).attributes
       visible += response["ApproximateNumberOfMessages"].to_i
       in_flight += response["ApproximateNumberOfMessagesNotVisible"].to_i
       stats_summary[queue[:name]] = {visible: visible, in_flight: in_flight}
     end
-    stats_summary
   end
 
   def messages(options={})
-    messages_result = []
     load_queue_urls unless @queues
-    @queues.select{|queue| queue[:source_url]}.each do |queue|
-      eval "@poller_#{queue[:name]} ||= Aws::SQS::QueuePoller.new(queue[:url], {client: sqs, skip_delete: true, idle_timeout: 1, 
-        wait_time_seconds: 1, visibility_timeout: options[:visibility_timeout] || 5})"
-      Timeout::timeout(30) do
-        instance_variable_get("@poller_#{queue[:name]}").poll do |message|
-          if options[:action] == :delete 
-            if options[:message_id] == message.message_id && options[:queue_name] == queue[:name]
-              response = instance_variable_get("@poller_#{queue[:name]}").delete_message(message)
-              if response.successful?
-                flash_message.message = "Message ID: #{options[:message_id]} in Queue #{options[:queue_name]} was successfully removed."
-              else
-                flash_message.message = "Error while trying to delete Message ID: #{options[:message_id]} in Queue #{options[:queue_name]}: #{response.inspect}"
-              end
-              messages_result << {message: message, queue: queue}
-              throw :stop_polling
-            end            
-          else
-            messages_result << {message: message, queue: queue}
-          end
-        end
+    @queues.select{|queue| queue[:source_url]}.each_with_object([]) do |queue, messages_result|
+      poll_by_queue_and_result_and_options(queue, messages_result, options)
+    end
+  end
+
+  def poll_by_queue_and_result_and_options(queue, result, options)
+    poller = Aws::SQS::QueuePoller.new(queue[:url], {client: sqs, skip_delete: true, idle_timeout: 1, 
+      wait_time_seconds: 1, visibility_timeout: options[:visibility_timeout] || 5})
+    Timeout::timeout(30) do
+      poller.poll do |message|
+        process_message_by_result_and_poller_and_queue_and_options(result, poller, message, queue, options)
       end
     end
-    messages_result
+  end
+
+  def process_message_by_result_and_poller_and_queue_and_options(result, poller, message, queue, options)
+    if options[:action] == :delete && options[:message_id] == message.message_id && options[:queue_name] == queue[:name]
+      set_flash_message_by_action_and_response_and_options(:delete, poller.delete_message(message), options)
+      result << {message: message, queue: queue}
+      throw :stop_polling
+    else
+      result << {message: message, queue: queue}
+    end
+  end
+
+  def set_flash_message_by_action_and_response_and_options(action, response, options)
+    case action
+    when :delete
+      flash_message.message = if response.successful?
+        "Message ID: #{options[:message_id]} in Queue #{options[:queue_name]} was successfully removed."
+      else
+        "Error while trying to delete Message ID: #{options[:message_id]} in Queue #{options[:queue_name]}: #{response.inspect}"
+      end
+    end
   end
 
   def initialize_aws

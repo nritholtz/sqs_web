@@ -1,7 +1,7 @@
 GIT
   remote: https://github.com/nritholtz/fake_sqs.git
-  revision: 5ad440c630b9376ed679ceb29ee09f8b93ece57e
-  ref: 5ad440c630b9376ed679ceb29ee09f8b93ece57e
+  revision: 3b1434a1c393ba0cc4172354a2e463388da71a40
+  ref: 3b1434a1c393ba0cc4172354a2e463388da71a40
   specs:
     fake_sqs (0.3.1)
       builder
