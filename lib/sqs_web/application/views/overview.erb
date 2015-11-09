@@ -9,7 +9,7 @@
     <th>Queue Name</th>
     <th>Visible Messages Count</th>
     <th>In Flight Messages Count</th>
-    <th>Origin Queue</th>
+    <th>Source Queue</th>
   </tr>
   <% @queues.each do |queue| %>
     <%= partial :queue_stats, {:queue => queue, :stats => @stats[queue[:name]]} %>

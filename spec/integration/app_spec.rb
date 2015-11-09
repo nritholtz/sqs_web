@@ -7,16 +7,28 @@ RSpec.describe "Mounted in Rails Application", :sqs do
     RailsApp
   end
 
-  QUEUE_NAME = "test-source"
+  SOURCE_QUEUE_NAME = "TestSourceQueue"
+
+  DLQ_QUEUE_NAME = "TestSourceQueueDLQ"
 
   let(:sqs) { Aws::SQS::Client.new(region: "us-east-1", credentials: Aws::Credentials.new("fake", "fake")) }
 
-  let(:queue_url) { sqs.get_queue_url(queue_name: QUEUE_NAME).queue_url }
+  let(:source_queue_url) { sqs.get_queue_url(queue_name: SOURCE_QUEUE_NAME).queue_url }
+
+  let(:dlq_queue_url) { sqs.get_queue_url(queue_name: DLQ_QUEUE_NAME).queue_url }
 
   before do
     sqs.config.endpoint = $fake_sqs.uri
-    sqs.create_queue(queue_name: QUEUE_NAME)
-    SqsWeb.options[:queues] = [QUEUE_NAME]
+    [SOURCE_QUEUE_NAME, DLQ_QUEUE_NAME].each{|queue_name| sqs.create_queue(queue_name: queue_name)}
+    dlq_arn = sqs.get_queue_attributes(queue_url: dlq_queue_url).attributes.fetch("QueueArn")
+    #Set DLQ
+    sqs.set_queue_attributes(
+      queue_url: source_queue_url, 
+      attributes: {
+        "RedrivePolicy" => "{\"deadLetterTargetArn\":\"#{dlq_arn}\",\"maxReceiveCount\":10}"
+      }
+    )
+    SqsWeb.options[:queues] = [SOURCE_QUEUE_NAME, DLQ_QUEUE_NAME]
   end
 
   # basic smoke test all the tabs
@@ -27,6 +39,46 @@ RSpec.describe "Mounted in Rails Application", :sqs do
     end
   end
 
+  describe "Overview page" do
+    it "will show Visible Messages" do
+      default_messages
+
+      get "/sqs/overview"
+
+      content = sanitize_content(last_response.body)
+      expect(content).to include "#{SOURCE_QUEUE_NAME} 5 0 N/A" 
+      expect(content).to include "#{DLQ_QUEUE_NAME} 3 0 #{source_queue_url}"
+    end
+
+    specify "In Flight Messages" do
+      default_messages
+
+      receive_messages(source_queue_url, 3)
+      receive_messages(dlq_queue_url, 2)
+      
+      get "/sqs/overview"
+
+      content = sanitize_content(last_response.body)
+      expect(content).to include "#{SOURCE_QUEUE_NAME} 2 3 N/A" 
+      expect(content).to include "#{DLQ_QUEUE_NAME} 1 2 #{source_queue_url}"
+    end
+
+    specify "should be default page" do
+      get "/sqs"
+      follow_redirect!
+
+      expect(last_request.url).to match(/\/sqs\/overview$/)
+    end
+
+    specify "handle non existent queues" do
+      SqsWeb.options[:queues] = ["BOGUSQUEUE"]
+
+      get "/sqs/overview"
+
+      content = sanitize_content(last_response.body)
+      expect(content).to include "Aws::SQS::Errors::NonExistentQueue: BOGUSQUEUE"
+    end
+  end
   # specify "SendMessage" do
   #   msg = "this is my message"
 
@@ -245,4 +297,26 @@ RSpec.describe "Mounted in Rails Application", :sqs do
   #   $fake_sqs.expire
   # end
 
+  def receive_messages(queue_url, count=1)
+    sqs.receive_message({
+      queue_url: queue_url,
+      max_number_of_messages: count,
+      wait_time_seconds: 1
+    })
+  end
+
+  def default_messages
+    generate_messages(source_queue_url, 5)
+    generate_messages(dlq_queue_url, 3)
+  end
+
+  def generate_messages(queue_url, count=1)
+    count.times do |time|
+      sqs.send_message(queue_url: queue_url, message_body: "Test_#{time}").inspect
+    end
+  end
+
+  def sanitize_content(content)
+    ActionView::Base.full_sanitizer.sanitize(content).gsub(/\s+/,' ').strip
+  end
 end
