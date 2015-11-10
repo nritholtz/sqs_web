@@ -43,9 +43,9 @@ class SqsWeb < Sinatra::Base
     # Deny the request, don't clear the session
     :reaction => :deny
 
-  def current_page
-    url_path request.path_info.sub('/','')
-  end
+  # def current_page
+  #   url_path request.path_info.sub('/','')
+  # end
 
   def url_path(*path_parts)
     [ path_prefix, path_parts ].join("/").squeeze('/')
@@ -100,8 +100,8 @@ class SqsWeb < Sinatra::Base
   end
 
   post "/remove/:queue_name/:message_id" do
-    result = messages({visibility_timeout: 4, action: :delete, message_id: params[:message_id], queue_name: params[:queue_name]})
-    flash_message.message = "Message ID: #{params[:message_id]} in Queue #{params[:queue_name]} has already been deleted or no longer exists." if result.empty?
+    result = messages({action: :delete, message_id: params[:message_id], queue_name: params[:queue_name]})
+    flash_message.message = "Message ID: #{params[:message_id]} in Queue #{params[:queue_name]} has already been deleted or is not visible." if result.empty?
     redirect back
   end
 
@@ -132,12 +132,13 @@ class SqsWeb < Sinatra::Base
     load_queue_urls unless @queues
     @queues.select{|queue| queue[:source_url]}.each_with_object([]) do |queue, messages_result|
       poll_by_queue_and_result_and_options(queue, messages_result, options)
+      expire_messages(messages_result.reject{|c| c[:deleted]})
     end
   end
 
   def poll_by_queue_and_result_and_options(queue, result, options)
-    poller = Aws::SQS::QueuePoller.new(queue[:url], {client: sqs, skip_delete: true, idle_timeout: 1, 
-      wait_time_seconds: 1, visibility_timeout: options[:visibility_timeout] || 5})
+    poller = Aws::SQS::QueuePoller.new(queue[:url], {client: sqs, skip_delete: true, idle_timeout: 0.2, 
+     wait_time_seconds: 0, visibility_timeout: options[:visibility_timeout] || 5 })
     Timeout::timeout(30) do
       poller.poll do |message|
         process_message_by_result_and_poller_and_queue_and_options(result, poller, message, queue, options)
@@ -145,10 +146,22 @@ class SqsWeb < Sinatra::Base
     end
   end
 
+  def expire_messages(messages)
+    # Change visiblity batch is limited to 10 requests per batch
+    messages.each_slice(10) do |message_batch|
+      sqs.change_message_visibility_batch({
+        queue_url: message_batch.first[:queue][:url],
+        entries: message_batch.map do |message| 
+          {id: message[:message].message_id, receipt_handle: message[:message].receipt_handle, visibility_timeout: 0}
+        end
+      })
+    end
+  end
+
   def process_message_by_result_and_poller_and_queue_and_options(result, poller, message, queue, options)
     if options[:action] == :delete && options[:message_id] == message.message_id && options[:queue_name] == queue[:name]
       set_flash_message_by_action_and_response_and_options(:delete, poller.delete_message(message), options)
-      result << {message: message, queue: queue}
+      result << {message: message, queue: queue, deleted: true}
       throw :stop_polling
     else
       result << {message: message, queue: queue}

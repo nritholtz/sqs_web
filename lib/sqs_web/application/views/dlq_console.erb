@@ -2,7 +2,7 @@
 <p class="sub">
   The list below contains all messages currently visible in SQS DLQ queues.
 </p>
-<p><%=h flash_message.message %></p>
+<p id="alert"><%=h flash_message.message %></p>
 <p class="sub">
   <%= "Showing #{@messages.count} visible messages." %>
 </p>

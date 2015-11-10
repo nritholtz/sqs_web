@@ -1,11 +1,9 @@
 require 'support/rails_app'
 require 'support/fake_sqs'
 
+Capybara.app = RailsApp
+
 RSpec.describe "Mounted in Rails Application", :sqs do
-  include Rack::Test::Methods
-  def app
-    RailsApp
-  end
 
   SOURCE_QUEUE_NAME = "TestSourceQueue"
 
@@ -34,8 +32,8 @@ RSpec.describe "Mounted in Rails Application", :sqs do
   # basic smoke test all the tabs
   %w(overview dlq_console).each do |tab|
     specify "test_#{tab}" do
-      get "/sqs/#{tab}"
-      expect(last_response).to be_ok
+      visit "/sqs/#{tab}"
+      expect(page.status_code).to eq 200
     end
   end
 
@@ -43,11 +41,10 @@ RSpec.describe "Mounted in Rails Application", :sqs do
     it "will show Visible Messages" do
       default_messages
 
-      get "/sqs/overview"
+      visit "/sqs/overview"
 
-      content = sanitize_content(last_response.body)
-      expect(content).to include "#{SOURCE_QUEUE_NAME} 5 0 N/A" 
-      expect(content).to include "#{DLQ_QUEUE_NAME} 3 0 #{source_queue_url}"
+      expect(page).to have_content "#{SOURCE_QUEUE_NAME} 5 0 N/A" 
+      expect(page).to have_content "#{DLQ_QUEUE_NAME} 3 0 #{source_queue_url}"
     end
 
     specify "In Flight Messages" do
@@ -56,27 +53,56 @@ RSpec.describe "Mounted in Rails Application", :sqs do
       receive_messages(source_queue_url, 3)
       receive_messages(dlq_queue_url, 2)
       
-      get "/sqs/overview"
+      visit "/sqs/overview"
 
-      content = sanitize_content(last_response.body)
-      expect(content).to include "#{SOURCE_QUEUE_NAME} 2 3 N/A" 
-      expect(content).to include "#{DLQ_QUEUE_NAME} 1 2 #{source_queue_url}"
+      expect(page).to have_content "#{SOURCE_QUEUE_NAME} 2 3 N/A" 
+      expect(page).to have_content "#{DLQ_QUEUE_NAME} 1 2 #{source_queue_url}"
     end
 
     specify "should be default page" do
-      get "/sqs"
-      follow_redirect!
+      visit "/sqs"
 
-      expect(last_request.url).to match(/\/sqs\/overview$/)
+      expect(current_path).to eq "/sqs/overview"
     end
 
     specify "handle non existent queues" do
       SqsWeb.options[:queues] = ["BOGUSQUEUE"]
 
-      get "/sqs/overview"
+      visit "/sqs/overview"
 
-      content = sanitize_content(last_response.body)
-      expect(content).to include "Aws::SQS::Errors::NonExistentQueue: BOGUSQUEUE"
+      expect(page).to have_content "Aws::SQS::Errors::NonExistentQueue: BOGUSQUEUE"
+    end
+  end
+
+  describe "DLQ Console" do
+    it "should delete single message" do
+      messages = generate_messages(dlq_queue_url, 2)
+      deleted_message_id = messages.pop.message_id
+      retained_message_id = messages.pop.message_id
+
+      visit "/sqs/dlq_console"
+
+      within("##{deleted_message_id}") do
+        click_on "Remove"
+      end
+
+      success_message = "Message ID: #{deleted_message_id} in Queue #{DLQ_QUEUE_NAME} was successfully removed."
+      expect(first("#alert").text).to eq success_message
+
+      expect(page.all("##{deleted_message_id}").count).to eq 0
+      expect(page.all("##{retained_message_id}").count).to eq 1
+
+      visit "/sqs/overview"
+
+      expect(page).to have_content "#{DLQ_QUEUE_NAME} 1 0 #{source_queue_url}"
+    end
+
+    it "should only show unique entries for each message" do
+      message_ids = generate_messages(dlq_queue_url, 5).map{|c| c.message_id}
+
+      visit "/sqs/dlq_console"
+
+      message_ids.each{|message_id| expect(page.all("##{message_id}").count).to eq 1}
     end
   end
   # specify "SendMessage" do
@@ -306,17 +332,14 @@ RSpec.describe "Mounted in Rails Application", :sqs do
   end
 
   def default_messages
-    generate_messages(source_queue_url, 5)
-    generate_messages(dlq_queue_url, 3)
+    generate_messages(source_queue_url, 5) + generate_messages(dlq_queue_url, 3)
   end
 
   def generate_messages(queue_url, count=1)
+    messages = []
     count.times do |time|
-      sqs.send_message(queue_url: queue_url, message_body: "Test_#{time}").inspect
+      messages << sqs.send_message(queue_url: queue_url, message_body: "Test_#{time}")
     end
-  end
-
-  def sanitize_content(content)
-    ActionView::Base.full_sanitizer.sanitize(content).gsub(/\s+/,' ').strip
+    messages
   end
 end
