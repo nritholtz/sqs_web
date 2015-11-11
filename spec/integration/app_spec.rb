@@ -43,8 +43,8 @@ RSpec.describe "Mounted in Rails Application", :sqs do
 
       visit "/sqs/overview"
 
-      expect(page).to have_content "#{SOURCE_QUEUE_NAME} 5 0 N/A" 
-      expect(page).to have_content "#{DLQ_QUEUE_NAME} 3 0 #{source_queue_url}"
+      match_content(page, "#{SOURCE_QUEUE_NAME} 5 0 N/A")
+      match_content(page, "#{DLQ_QUEUE_NAME} 3 0 #{source_queue_url}")
     end
 
     specify "In Flight Messages" do
@@ -55,8 +55,8 @@ RSpec.describe "Mounted in Rails Application", :sqs do
       
       visit "/sqs/overview"
 
-      expect(page).to have_content "#{SOURCE_QUEUE_NAME} 2 3 N/A" 
-      expect(page).to have_content "#{DLQ_QUEUE_NAME} 1 2 #{source_queue_url}"
+      match_content(page, "#{SOURCE_QUEUE_NAME} 2 3 N/A")
+      match_content(page, "#{DLQ_QUEUE_NAME} 1 2 #{source_queue_url}")
     end
 
     specify "should be default page" do
@@ -70,7 +70,7 @@ RSpec.describe "Mounted in Rails Application", :sqs do
 
       visit "/sqs/overview"
 
-      expect(page).to have_content "Aws::SQS::Errors::NonExistentQueue: BOGUSQUEUE"
+      match_content(page, "Aws::SQS::Errors::NonExistentQueue: BOGUSQUEUE")
     end
   end
 
@@ -94,7 +94,7 @@ RSpec.describe "Mounted in Rails Application", :sqs do
 
       visit "/sqs/overview"
 
-      expect(page).to have_content "#{DLQ_QUEUE_NAME} 1 0 #{source_queue_url}"
+      match_content(page, "#{DLQ_QUEUE_NAME} 1 0 #{source_queue_url}")
     end
 
     it "should only show unique entries for each message" do
@@ -104,228 +104,61 @@ RSpec.describe "Mounted in Rails Application", :sqs do
 
       message_ids.each{|message_id| expect(page.all("##{message_id}").count).to eq 1}
     end
+
+    it "should handle deleting single message that is already deleted" do
+      deleted_message_id = generate_messages(dlq_queue_url, 1).first.message_id
+      
+      visit "/sqs/dlq_console"
+
+      sqs.purge_queue({ queue_url: dlq_queue_url })
+
+      within("##{deleted_message_id}") do
+        click_on "Remove"
+      end
+      
+      error_message = "Message ID: #{deleted_message_id} in Queue #{DLQ_QUEUE_NAME} has already been deleted or is not visible."
+      expect(first("#alert").text).to eq error_message
+    end
+
+    it "should render all information related to the visible messages" do
+      generate_messages(dlq_queue_url, 1)
+
+      visit "/sqs/dlq_console"
+
+      message = receive_messages(dlq_queue_url).messages.first
+      message.attributes["ApproximateReceiveCount"] = "1"
+
+      message_metadata = <<-EOF
+      ID #{message.message_id} Receive Count 1 
+      Queue Name #{DLQ_QUEUE_NAME} Origin Queue #{source_queue_url}
+      Message Body Test_0
+      EOF
+
+      message_entry = first("##{message.message_id}")
+
+      match_content(message_entry, normalize_whitespace(message_metadata))
+      match_content(message_entry, normalize_whitespace(message.inspect.to_yaml.split('receipt_handle')[0]))
+      match_content(message_entry, normalize_whitespace(message.inspect.to_yaml.split('md5')[1]))
+      match_content(message_entry, normalize_whitespace("Enqueued At #{Time.at(message.attributes["SentTimestamp"].to_i/1000).rfc822}"))
+    end
+
+    it "should not display any messages that are not in a DLQ" do
+      generate_messages(source_queue_url, 1)
+
+      visit "/sqs/dlq_console"
+
+      message = receive_messages(source_queue_url).messages.first
+
+      expect(first("##{message.message_id}")).to be_nil
+
+      match_content(page, "Showing 0 visible messages")
+    end
   end
-  # specify "SendMessage" do
-  #   msg = "this is my message"
-
-  #   result = sqs.send_message(
-  #     queue_url: queue_url,
-  #     message_body: msg,
-  #   )
-
-  #   expect(result.md5_of_message_body).to eq Digest::MD5.hexdigest(msg)
-  #   expect(result.message_id.size).to eq 36
-  # end
-
-  # specify "ReceiveMessage" do
-  #   body = "test 123"
-
-  #   sqs.send_message(
-  #     queue_url: queue_url,
-  #     message_body: body
-  #   )
-
-  #   response = sqs.receive_message(
-  #     queue_url: queue_url,
-  #   )
-
-  #   expect(response.messages.size).to eq 1
-
-  #   expect(response.messages.first.body).to eq body
-  # end
-
-  # specify "DeleteMessage" do
-  #   sqs.send_message(
-  #     queue_url: queue_url,
-  #     message_body: "test",
-  #   )
-
-  #   message1 = sqs.receive_message(
-  #     queue_url: queue_url,
-  #   ).messages.first
-
-  #   sqs.delete_message(
-  #     queue_url: queue_url,
-  #     receipt_handle: message1.receipt_handle,
-  #   )
-
-  #   let_messages_in_flight_expire
-
-  #   response = sqs.receive_message(
-  #     queue_url: queue_url,
-  #   )
-  #   expect(response.messages.size).to eq 0
-  # end
-
-  # specify "DeleteMessageBatch" do
-  #   sqs.send_message(
-  #     queue_url: queue_url,
-  #     message_body: "test1"
-  #   )
-  #   sqs.send_message(
-  #     queue_url: queue_url,
-  #     message_body: "test2"
-  #   )
-
-  #   messages_response = sqs.receive_message(
-  #     queue_url: queue_url,
-  #     max_number_of_messages: 2,
-  #   )
-
-  #   entries = messages_response.messages.map { |msg|
-  #     {
-  #       id: SecureRandom.uuid,
-  #       receipt_handle: msg.receipt_handle,
-  #     }
-  #   }
-
-  #   sqs.delete_message_batch(
-  #     queue_url: queue_url,
-  #     entries: entries,
-  #   )
-
-  #   let_messages_in_flight_expire
-
-  #   response = sqs.receive_message(
-  #     queue_url: queue_url,
-  #   )
-  #   expect(response.messages.size).to eq 0
-  # end
-
-  # specify "PurgeQueue" do
-  #   sqs.send_message(
-  #     queue_url: queue_url,
-  #     message_body: "test1"
-  #   )
-  #   sqs.send_message(
-  #     queue_url: queue_url,
-  #     message_body: "test2"
-  #   )
-
-  #   sqs.purge_queue(
-  #     queue_url: queue_url,
-  #   )
-
-  #   response = sqs.receive_message(
-  #     queue_url: queue_url,
-  #   )
-  #   expect(response.messages.size).to eq 0
-  # end
-
-  # specify "SendMessageBatch" do
-  #   bodies = %w(a b c)
-
-  #   sqs.send_message_batch(
-  #     queue_url: queue_url,
-  #     entries: bodies.map { |bd|
-  #       {
-  #         id: SecureRandom.uuid,
-  #         message_body: bd,
-  #       }
-  #     }
-  #   )
-
-  #   messages_response = sqs.receive_message(
-  #     queue_url: queue_url,
-  #     max_number_of_messages: 3,
-  #   )
-
-  #   expect(messages_response.messages.map(&:body)).to match_array bodies
-  # end
-
-  # specify "set message timeout to 0" do
-  #   body = 'some-sample-message'
-
-  #   sqs.send_message(
-  #     queue_url: queue_url,
-  #     message_body: body,
-  #   )
-
-  #   message = sqs.receive_message(
-  #     queue_url: queue_url,
-  #   ).messages.first
-
-  #   expect(message.body).to eq body
-
-  #   sqs.change_message_visibility(
-  #     queue_url: queue_url,
-  #     receipt_handle: message.receipt_handle,
-  #     visibility_timeout: 0
-  #   )
-
-  #   same_message = sqs.receive_message(
-  #     queue_url: queue_url,
-  #   ).messages.first
-  #   expect(same_message.body).to eq body
-  # end
-
-  # specify 'set message timeout and wait for message to come' do
-
-  #   body = 'some-sample-message'
-
-  #   sqs.send_message(
-  #     queue_url: queue_url,
-  #     message_body: body,
-  #   )
-
-  #   message = sqs.receive_message(
-  #     queue_url: queue_url,
-  #   ).messages.first
-  #   expect(message.body).to eq body
-
-  #   sqs.change_message_visibility(
-  #     queue_url: queue_url,
-  #     receipt_handle: message.receipt_handle,
-  #     visibility_timeout: 2
-  #   )
-
-  #   nothing = sqs.receive_message(
-  #     queue_url: queue_url,
-  #   )
-  #   expect(nothing.messages.size).to eq 0
-
-  #   sleep(5)
-
-  #   same_message = sqs.receive_message(
-  #     queue_url: queue_url,
-  #   ).messages.first
-  #   expect(same_message.body).to eq body
-  # end
-
-  # specify 'should fail if trying to update the visibility_timeout for a message that is not in flight' do
-  #   body = 'some-sample-message'
-  #   sqs.send_message(
-  #     queue_url: queue_url,
-  #     message_body: body,
-  #   )
-
-  #   message = sqs.receive_message(
-  #     queue_url: queue_url,
-  #   ).messages.first
-  #   expect(message.body).to eq body
-
-  #   sqs.change_message_visibility(
-  #     queue_url: queue_url,
-  #     receipt_handle: message.receipt_handle,
-  #     visibility_timeout: 0
-  #   )
-
-  #   expect {
-  #     sqs.change_message_visibility(
-  #       queue_url: queue_url,
-  #       receipt_handle: message.receipt_handle,
-  #       visibility_timeout: 30
-  #     )
-  #   }.to raise_error(Aws::SQS::Errors::MessageNotInflight)
-  # end
-
-  # def let_messages_in_flight_expire
-  #   $fake_sqs.expire
-  # end
 
   def receive_messages(queue_url, count=1)
     sqs.receive_message({
       queue_url: queue_url,
+      attribute_names: ["All"],
       max_number_of_messages: count,
       wait_time_seconds: 1
     })

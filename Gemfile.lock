@@ -52,6 +52,7 @@ GEM
     aws-sdk-resources (2.1.35)
       aws-sdk-core (= 2.1.35)
     builder (3.0.4)
+    byebug (8.1.0)
     capybara (2.5.0)
       mime-types (>= 1.16)
       nokogiri (>= 1.3.3)
@@ -144,6 +145,7 @@ PLATFORMS
   ruby
 
 DEPENDENCIES
+  byebug
   capybara
   codeclimate-test-reporter
   fake_sqs!

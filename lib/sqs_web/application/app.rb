@@ -169,12 +169,10 @@ class SqsWeb < Sinatra::Base
   end
 
   def set_flash_message_by_action_and_response_and_options(action, response, options)
-    case action
-    when :delete
-      flash_message.message = if response.successful?
-        "Message ID: #{options[:message_id]} in Queue #{options[:queue_name]} was successfully removed."
-      else
-        "Error while trying to delete Message ID: #{options[:message_id]} in Queue #{options[:queue_name]}: #{response.inspect}"
+    if response.successful?
+      case action
+      when :delete
+        flash_message.message =  "Message ID: #{options[:message_id]} in Queue #{options[:queue_name]} was successfully removed."
       end
     end
   end

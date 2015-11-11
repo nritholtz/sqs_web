@@ -31,5 +31,6 @@ Gem::Specification.new do |gem|
   gem.add_development_dependency "rails",     ["~> 3.0"]
   gem.add_development_dependency "capybara"
   gem.add_development_dependency "codeclimate-test-reporter"
+  gem.add_development_dependency "byebug"
   #gem.add_development_dependency "fake_sqs",  ["~> 0.3.1"]
 end
