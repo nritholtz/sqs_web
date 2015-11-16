@@ -105,6 +105,12 @@ class SqsWeb < Sinatra::Base
     redirect back
   end
 
+  post "/requeue/:queue_name/:message_id" do
+    result = messages({action: :requeue, message_id: params[:message_id], queue_name: params[:queue_name]})
+    flash_message.message = "Message ID: #{params[:message_id]} in Queue #{params[:queue_name]} has already been deleted or is not visible." if result.empty?
+    redirect back
+  end
+
   get "/?" do
     redirect u(:overview)
   end
@@ -160,21 +166,36 @@ class SqsWeb < Sinatra::Base
 
   def process_message_by_result_and_poller_and_queue_and_options(result, poller, message, queue, options)
     if options[:action] == :delete && options[:message_id] == message.message_id && options[:queue_name] == queue[:name]
-      set_flash_message_by_action_and_response_and_options(:delete, poller.delete_message(message), options)
-      result << {message: message, queue: queue, deleted: true}
-      throw :stop_polling
+      set_flash_message_by_action_and_response_and_queue_and_options(:delete, poller.delete_message(message), queue, options)
+      signal_deleted_message(result, message, queue)
+    elsif options[:action] == :requeue && options[:message_id] == message.message_id && options[:queue_name] == queue[:name]
+      set_flash_message_by_action_and_response_and_queue_and_options(:requeue, move_message_to_queue(message, queue[:source_url], poller), queue, options)
+      signal_deleted_message(result, message, queue)
     else
       result << {message: message, queue: queue}
     end
   end
 
-  def set_flash_message_by_action_and_response_and_options(action, response, options)
+  def set_flash_message_by_action_and_response_and_queue_and_options(action, response, queue, options)
     if response.successful?
-      case action
+      flash_message.message = case action
       when :delete
-        flash_message.message =  "Message ID: #{options[:message_id]} in Queue #{options[:queue_name]} was successfully removed."
+        "Message ID: #{options[:message_id]} in Queue #{queue[:name]} was successfully removed."
+      when :requeue
+        "Message ID: #{options[:message_id]} in Queue #{queue[:name]} was successfully moved to Source Queue #{queue[:source_url]}."
       end
     end
+  end
+
+  def signal_deleted_message(result, message, queue)
+    result << {message: message, queue: queue, deleted: true}
+    throw :stop_polling
+  end
+
+  def move_message_to_queue(message, destination_queue_url, poller)
+    poller.change_message_visibility_timeout(message, 30)
+    sqs.send_message(queue_url: destination_queue_url, message_body: message.body, message_attributes: message.message_attributes)
+    poller.delete_message(message)
   end
 
   def initialize_aws

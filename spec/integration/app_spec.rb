@@ -129,16 +129,15 @@ RSpec.describe "Mounted in Rails Application", :sqs do
       message.attributes["ApproximateReceiveCount"] = "1"
 
       message_metadata = <<-EOF
-      ID #{message.message_id} Receive Count 1 
+      ID #{message.message_id} or Receive Count 1 
       Queue Name #{DLQ_QUEUE_NAME} Origin Queue #{source_queue_url}
       Message Body Test_0
       EOF
 
       message_entry = first("##{message.message_id}")
-
       match_content(message_entry, normalize_whitespace(message_metadata))
       match_content(message_entry, normalize_whitespace(message.inspect.to_yaml.split('receipt_handle')[0]))
-      match_content(message_entry, normalize_whitespace(message.inspect.to_yaml.split('md5')[1]))
+      match_content(message_entry, normalize_whitespace(message.inspect.to_yaml.split('md5', 2)[1]))
       match_content(message_entry, normalize_whitespace("Enqueued At #{Time.at(message.attributes["SentTimestamp"].to_i/1000).rfc822}"))
     end
 
@@ -153,12 +152,39 @@ RSpec.describe "Mounted in Rails Application", :sqs do
 
       match_content(page, "Showing 0 visible messages")
     end
+
+    it "should be able to move a single message to source queue" do
+      message_id = generate_messages(dlq_queue_url, 1).first.message_id
+      
+            
+      visit "/sqs/dlq_console"
+
+      within("##{message_id}") do
+        click_on "Move to Source Queue"
+      end
+
+      success_message = "Message ID: #{message_id} in Queue #{DLQ_QUEUE_NAME} was successfully moved to Source Queue #{source_queue_url}."
+      expect(first("#alert").text).to eq success_message
+      expect(page.all("##{message_id}").count).to eq 0
+
+      visit "/sqs/overview"
+
+      match_content(page, "#{SOURCE_QUEUE_NAME} 1 0 N/A")
+      match_content(page, "#{DLQ_QUEUE_NAME} 0 0 #{source_queue_url}")
+
+      moved_message = receive_messages(source_queue_url).messages.first
+      expect(moved_message).to_not be_nil
+      expect(moved_message.body).to eq "Test_0"
+      expect(moved_message.attributes["ApproximateReceiveCount"]).to eq "1"
+      expect(moved_message.message_attributes["foo_class"].to_hash).to eq({string_value: "FooWorker", data_type: "String"})
+    end
   end
 
   def receive_messages(queue_url, count=1)
     sqs.receive_message({
       queue_url: queue_url,
       attribute_names: ["All"],
+      message_attribute_names: ["All"],
       max_number_of_messages: count,
       wait_time_seconds: 1
     })
@@ -171,7 +197,8 @@ RSpec.describe "Mounted in Rails Application", :sqs do
   def generate_messages(queue_url, count=1)
     messages = []
     count.times do |time|
-      messages << sqs.send_message(queue_url: queue_url, message_body: "Test_#{time}")
+      messages << sqs.send_message(queue_url: queue_url, message_body: "Test_#{time}", 
+        message_attributes: {"foo_class"=> {string_value: "FooWorker", data_type: "String"}})
     end
     messages
   end

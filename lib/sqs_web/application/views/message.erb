@@ -6,6 +6,8 @@
       <a href="#<%= message.message_id %>"><%=h message.message_id %></a>
       <div class="controls">
         <form action="<%= u("remove/#{queue[:name]}/#{message.message_id}") %>" method="post"><%= csrf_token_tag %><input type="submit" value="Remove"></input></form>
+        or
+        <form action="<%= u("requeue/#{queue[:name]}/#{message.message_id}") %>" method="post"><%= csrf_token_tag %><input type="submit" value="Move to Source Queue"></input></form>
       </div>
     </dd>
     <% if message.attributes["ApproximateReceiveCount"] %>
