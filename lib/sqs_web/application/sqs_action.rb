@@ -1,4 +1,4 @@
-class AwsAction
+class SqsAction
   
   protected
   
