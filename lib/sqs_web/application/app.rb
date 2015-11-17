@@ -60,9 +60,11 @@ class SqsWeb < Sinatra::Base
     end
   end
 
-  post "/bulk_remove" do
-    process_page_bulk_request("remove", params) if params["message_collection"]
-    redirect back
+  %w(bulk_remove bulk_requeue).each do |action|
+    post "/#{action}" do
+      process_page_bulk_request(action.split('bulk_')[1], params) if params["message_collection"]
+      redirect back
+    end
   end
 
   get "/?" do
@@ -80,9 +82,9 @@ class SqsWeb < Sinatra::Base
     params["message_collection"].map!{|c| {message_id: c.split('/', 2)[0], queue_name: c.split('/', 2)[1]}}
     result = messages({action: action.to_sym, messages: params["message_collection"], bulk_action: true})
     flash_message.message = if result.select{|c| c[:deleted]}.size != params["message_collection"].size
-      "One or more messages may have already been deleted or is not visible."
+      "One or more messages may have already been #{action}d or is not visible."
     else
-      "Selected messages have been deleted successfully."
+      "Selected messages have been #{action}d successfully."
     end
   end
 

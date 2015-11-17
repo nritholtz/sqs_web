@@ -121,7 +121,7 @@ RSpec.describe "Mounted in Rails Application", :sqs do
       expect(first("#alert").text).to eq error_message
     end
 
-    it "should delete multiple selected messages" do
+    it "should remove multiple selected messages" do
       messages = generate_messages(dlq_queue_url, 6)
       deleted_message_ids = messages.pop(4).map{|c| c.message_id}
       retained_message_ids = messages.pop(2).map{|c| c.message_id}
@@ -134,7 +134,7 @@ RSpec.describe "Mounted in Rails Application", :sqs do
       
       click_on "Bulk Remove"
 
-      expect(first("#alert").text).to eq "Selected messages have been deleted successfully."
+      expect(first("#alert").text).to eq "Selected messages have been removed successfully."
 
       deleted_message_ids.each{|message_id| expect(page.all("##{message_id}").count).to eq 0}
       retained_message_ids.each{|message_id| expect(page.all("##{message_id}").count).to eq 1}
@@ -144,7 +144,7 @@ RSpec.describe "Mounted in Rails Application", :sqs do
       match_content(page, "#{DLQ_QUEUE_NAME} 2 0 #{source_queue_url}")
     end
 
-    it "should handle deleting multiple selected messages where one or more is already deleted or not visible" do
+    it "should handle removing multiple selected messages where one or more is already deleted or not visible" do
       generate_messages(dlq_queue_url, 3)
       
       visit "/sqs/dlq_console"
@@ -163,7 +163,7 @@ RSpec.describe "Mounted in Rails Application", :sqs do
       
       click_on "Bulk Remove"
 
-      expect(first("#alert").text).to eq "One or more messages may have already been deleted or is not visible."
+      expect(first("#alert").text).to eq "One or more messages may have already been removed or is not visible."
 
       messages.each{|message| expect(page.all("##{message.message_id}").count).to eq 0}
 
@@ -241,6 +241,79 @@ RSpec.describe "Mounted in Rails Application", :sqs do
       expect(moved_message.body).to eq "Test_0"
       expect(moved_message.attributes["ApproximateReceiveCount"]).to eq "1"
       expect(moved_message.message_attributes["foo_class"].to_hash).to eq({string_value: "FooWorker", data_type: "String"})
+    end
+
+    it "should move multiple selected messages" do
+      messages = generate_messages(dlq_queue_url, 6)
+      retained_message_ids = messages.pop(2).map{|c| c.message_id}
+      moved_message_ids = messages.pop(4).map{|c| c.message_id}
+
+      visit "/sqs/dlq_console"
+
+      moved_message_ids.each do |message_id|
+        first("#batch_action_item_#{message_id}").set(true)
+      end
+      
+      click_on "Bulk Move to Source Queue"
+
+      expect(first("#alert").text).to eq "Selected messages have been requeued successfully."
+
+      moved_message_ids.each{|message_id| expect(page.all("##{message_id}").count).to eq 0}
+      retained_message_ids.each{|message_id| expect(page.all("##{message_id}").count).to eq 1}
+
+      visit "/sqs/overview"
+
+      match_content(page, "#{SOURCE_QUEUE_NAME} 4 0 N/A")
+      match_content(page, "#{DLQ_QUEUE_NAME} 2 0 #{source_queue_url}")
+
+      moved_messages = receive_messages(source_queue_url, {count: 4}).messages.sort_by{|c| c.body}
+      moved_messages.each_with_index do |moved_message, index|
+        expect(moved_message).to_not be_nil
+        expect(moved_message.body).to match "Test_#{index}"
+        expect(moved_message.attributes["ApproximateReceiveCount"]).to eq "1"
+        expect(moved_message.message_attributes["foo_class"].to_hash).to eq({string_value: "FooWorker", data_type: "String"})
+      end
+    end
+
+    it "should handle moving multiple selected messages where one or more is already deleted or not visible" do
+      generate_messages(dlq_queue_url, 3)
+      
+      visit "/sqs/dlq_console"
+      
+      messages = receive_messages(dlq_queue_url, {count: 3}).messages
+      sqs.delete_message({queue_url: dlq_queue_url, receipt_handle: messages[2].receipt_handle})
+      sqs.change_message_visibility_batch({
+        queue_url: dlq_queue_url,
+        entries: messages.take(2).map do |message| 
+          {id: message.message_id, receipt_handle: message.receipt_handle, visibility_timeout: 0}
+        end
+      })
+      messages.each do |message|
+        first("#batch_action_item_#{message.message_id}").set(true)
+      end
+      
+      click_on "Bulk Move to Source Queue"
+
+      expect(first("#alert").text).to eq "One or more messages may have already been requeued or is not visible."
+
+      messages.each{|message| expect(page.all("##{message.message_id}").count).to eq 0}
+
+      visit "/sqs/overview"
+
+      match_content(page, "#{SOURCE_QUEUE_NAME} 2 0 N/A")
+      match_content(page, "#{DLQ_QUEUE_NAME} 0 0 #{source_queue_url}")
+    end
+
+    it "should handle clicking on Bulk Move to Source Queue without any selection" do
+      messages = generate_messages(dlq_queue_url, 3)
+      
+      visit "/sqs/dlq_console"
+
+      click_on "Bulk Move to Source Queue"
+
+      expect(first("#alert").text).to eq ""
+
+      messages.each{|message| expect(page.all("##{message.message_id}").count).to eq 1}
     end
   end
 
