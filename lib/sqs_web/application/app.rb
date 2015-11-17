@@ -61,7 +61,8 @@ class SqsWeb < Sinatra::Base
   end
 
   post "/bulk_remove" do
-    process_page_bulk_request("remove", params)
+    process_page_bulk_request("remove", params) if params["message_collection"]
+    redirect back
   end
 
   get "/?" do
@@ -76,16 +77,13 @@ class SqsWeb < Sinatra::Base
   end
 
   def process_page_bulk_request(action, params)
-    if params["message_collection"]
-      params["message_collection"].map!{|c| {message_id: c.split('/', 2)[0], queue_name: c.split('/', 2)[1]}}
-      result = messages({action: action.to_sym, messages: params["message_collection"], bulk_action: true})
-      flash_message.message  = if result.select{|c| c[:deleted]}.size != params["message_collection"].size
-        "One or more messages may have already been deleted or is not visible."
-      else
-        "Selected messages have been deleted successfully."
-      end
+    params["message_collection"].map!{|c| {message_id: c.split('/', 2)[0], queue_name: c.split('/', 2)[1]}}
+    result = messages({action: action.to_sym, messages: params["message_collection"], bulk_action: true})
+    flash_message.message = if result.select{|c| c[:deleted]}.size != params["message_collection"].size
+      "One or more messages may have already been deleted or is not visible."
+    else
+      "Selected messages have been deleted successfully."
     end
-    redirect back
   end
 
   def queue_stats
@@ -126,10 +124,14 @@ class SqsWeb < Sinatra::Base
 
   def message_match(options)
     if options[:bulk_action]
-      options[:messages].find{|message| message[:message_id] == options[:message].message_id && message[:queue_name] == options[:queue][:name]}
+      options[:messages].find{|message| match_message_by_options(message[:message_id], message[:queue_name], options)}
     else
-      options[:action] && options[:message_id] == options[:message].message_id && options[:queue_name] == options[:queue][:name]
+      options[:action] && match_message_by_options(options[:message_id], options[:queue_name], options)
     end
+  end
+
+  def match_message_by_options(message_id, queue_name, options)
+    message_id == options[:message].message_id && queue_name == options[:queue][:name]
   end
 
   def signal_deleted_message(result, options)
