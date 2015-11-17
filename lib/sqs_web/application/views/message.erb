@@ -1,4 +1,5 @@
 <li class="job" id="<%= message.message_id %>">
+  <input type="checkbox" id="batch_action_item_<%= message.message_id %>" value="<%= message.message_id %>/<%= queue[:name] %>" name="message_collection[]"/>
   <dl>
     <dt>ID</dt>
     <dd>

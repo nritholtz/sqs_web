@@ -6,8 +6,10 @@
 <p class="sub">
   <%= "Showing #{@messages.count} visible messages." %>
 </p>
+<form action="<%= u("bulk_remove") %>" method="post"><%= csrf_token_tag %><input type="submit" value="Bulk Remove" />
 <ul class="job">
   <% @messages.each do |message| %>
     <%= partial :message, {:message => message[:message], :queue => message[:queue]} %>
   <% end %>
 </ul>
+</form>

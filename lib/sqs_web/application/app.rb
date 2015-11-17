@@ -56,10 +56,12 @@ class SqsWeb < Sinatra::Base
 
   %w(remove requeue).each do |action|
     post "/#{action}/:queue_name/:message_id" do
-      result = messages({action: action.to_sym, message_id: params[:message_id], queue_name: params[:queue_name]})
-      flash_message.message = "Message ID: #{params[:message_id]} in Queue #{params[:queue_name]} has already been deleted or is not visible." if result.empty?
-      redirect back
+      process_page_single_request(action, params)
     end
+  end
+
+  post "/bulk_remove" do
+    process_page_bulk_request("remove", params)
   end
 
   get "/?" do
@@ -67,6 +69,25 @@ class SqsWeb < Sinatra::Base
   end
 
   private
+  def process_page_single_request(action, params)
+    result = messages({action: action.to_sym, message_id: params[:message_id], queue_name: params[:queue_name]})
+    flash_message.message = "Message ID: #{params[:message_id]} in Queue #{params[:queue_name]} has already been deleted or is not visible." if result.empty?
+    redirect back
+  end
+
+  def process_page_bulk_request(action, params)
+    if params["message_collection"]
+      params["message_collection"].map!{|c| {message_id: c.split('/', 2)[0], queue_name: c.split('/', 2)[1]}}
+      result = messages({action: action.to_sym, messages: params["message_collection"], bulk_action: true})
+      flash_message.message  = if result.select{|c| c[:deleted]}.size != params["message_collection"].size
+        "One or more messages may have already been deleted or is not visible."
+      else
+        "Selected messages have been deleted successfully."
+      end
+    end
+    redirect back
+  end
+
   def queue_stats
     @queues ||= AwsAction.load_queue_urls
     AwsAction.get_queue_stats(@queues)
@@ -85,28 +106,34 @@ class SqsWeb < Sinatra::Base
      wait_time_seconds: 0, visibility_timeout: options[:visibility_timeout] || 5 })
     Timeout::timeout(30) do
       poller.poll do |message|
-        process_message_by_result_and_poller_and_queue_and_options(result, poller, message, queue, options)
+        process_message_by_result_and_options(result, 
+          options.merge({ poller: poller, message: message, queue: queue})
+        )
       end
     end
   end
 
-  def process_message_by_result_and_poller_and_queue_and_options(result, poller, message, queue, options)
-    if message_match_with_action(message, queue, options)
-      AwsAction.process_action_by_message(message, 
-        options.merge({poller: poller, queue: queue, flash_message: flash_message})
+  def process_message_by_result_and_options(result, options)
+    if message_match(options)
+      AwsAction.process_action_by_message(options[:message], 
+        options.merge({flash_message: flash_message})
       )
-      signal_deleted_message(result, message, queue)
+      signal_deleted_message(result, options)
     else
-      result << {message: message, queue: queue}
+      result << {message: options[:message], queue: options[:queue]}
     end
   end
 
-  def message_match_with_action(message, queue, options)
-    options[:action] && options[:message_id] == message.message_id && options[:queue_name] == queue[:name]
+  def message_match(options)
+    if options[:bulk_action]
+      options[:messages].find{|message| message[:message_id] == options[:message].message_id && message[:queue_name] == options[:queue][:name]}
+    else
+      options[:action] && options[:message_id] == options[:message].message_id && options[:queue_name] == options[:queue][:name]
+    end
   end
 
-  def signal_deleted_message(result, message, queue)
-    result << {message: message, queue: queue, deleted: true}
-    throw :stop_polling
+  def signal_deleted_message(result, options)
+    result << {message: options[:message], queue: options[:queue], deleted: true}
+    throw :stop_polling unless (options[:messages] && result.select{|c| c[:deleted]}.size < options[:messages].size)
   end
 end
