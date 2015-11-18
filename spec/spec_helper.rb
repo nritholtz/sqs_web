@@ -1,5 +1,6 @@
 require "codeclimate-test-reporter"
 require "byebug"
+require 'capybara-webkit'
 require 'capybara/rspec'
 CodeClimate::TestReporter.start
 
@@ -9,6 +10,8 @@ RSpec.configure do |config|
   config.disable_monkey_patching!
   config.include Capybara::DSL
 end
+
+Capybara.javascript_driver = :webkit
 
 def match_content(actual, expected)
   actual_text = actual.respond_to?(:text) ? normalize_whitespace(actual.text) : actual

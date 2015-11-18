@@ -6,13 +6,16 @@
 <p class="sub">
   <%= "Showing #{@messages.count} visible messages." %>
 </p>
-<form method="post">
+<form method="post" id="bulk_action_form">
   <%= csrf_token_tag %>
-  <input type="submit" value="Bulk Remove" formaction="<%= u("bulk_remove") %>"/>
-  <input type="submit" value="Bulk Move to Source Queue" formaction="<%= u("bulk_requeue") %>"/>
-  <ul class="job">
-    <% @messages.each do |message| %>
-      <%= partial :message, {:message => message[:message], :queue => message[:queue]} %>
-    <% end %>
-  </ul>
-</form>
+  Select/Unselect All <input type="checkbox" id="select_all" />
+  <div id="bulk_action_submit">
+    <input type="submit" value="Bulk Remove" action="<%= u("bulk_remove") %>"/>
+    <input type="submit" value="Bulk Move to Source Queue" action="<%= u("bulk_requeue") %>"/>
+  </div>
+</form> 
+<ul class="job">
+  <% @messages.each do |message| %>
+    <%= partial :message, {:message => message[:message], :queue => message[:queue]} %>
+  <% end %>
+</ul>

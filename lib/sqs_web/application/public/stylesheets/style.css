@@ -54,3 +54,5 @@ pre { font-family:Courier New; line-height:1.4em; }
 #main ul.job li dl dd.error pre { margin-top:3px; line-height:1.3;}
 
 #main .time a.toggle_format {text-decoration:none;}
+
+#bulk_action_submit { float:right;}

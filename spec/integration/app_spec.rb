@@ -74,14 +74,14 @@ RSpec.describe "Mounted in Rails Application", :sqs do
     end
   end
 
-  describe "DLQ Console" do
+  describe "DLQ Console", js: true do
 
     it "should only show unique entries for each message" do
       message_ids = generate_messages(dlq_queue_url, 5).map{|c| c.message_id}
 
       visit "/sqs/dlq_console"
 
-      message_ids.each{|message_id| expect(page.all("##{message_id}").count).to eq 1}
+      message_ids.each{|message_id| expect(page.all("#message_#{message_id}").count).to eq 1}
     end
 
     it "should delete single message" do
@@ -91,15 +91,17 @@ RSpec.describe "Mounted in Rails Application", :sqs do
 
       visit "/sqs/dlq_console"
 
-      within("##{deleted_message_id}") do
+      first("#message_#{deleted_message_id}").hover
+
+      within("#message_#{deleted_message_id}") do
         click_on "Remove"
       end
 
       success_message = "Message ID: #{deleted_message_id} in Queue #{DLQ_QUEUE_NAME} was successfully removed."
       expect(first("#alert").text).to eq success_message
 
-      expect(page.all("##{deleted_message_id}").count).to eq 0
-      expect(page.all("##{retained_message_id}").count).to eq 1
+      expect(page.all("#message_#{deleted_message_id}").count).to eq 0
+      expect(page.all("#message_#{retained_message_id}").count).to eq 1
 
       visit "/sqs/overview"
 
@@ -113,7 +115,9 @@ RSpec.describe "Mounted in Rails Application", :sqs do
 
       sqs.purge_queue({ queue_url: dlq_queue_url })
 
-      within("##{deleted_message_id}") do
+      first("#message_#{deleted_message_id}").hover
+
+      within("#message_#{deleted_message_id}") do
         click_on "Remove"
       end
       
@@ -136,8 +140,8 @@ RSpec.describe "Mounted in Rails Application", :sqs do
 
       expect(first("#alert").text).to eq "Selected messages have been removed successfully."
 
-      deleted_message_ids.each{|message_id| expect(page.all("##{message_id}").count).to eq 0}
-      retained_message_ids.each{|message_id| expect(page.all("##{message_id}").count).to eq 1}
+      deleted_message_ids.each{|message_id| expect(page.all("#message_#{message_id}").count).to eq 0}
+      retained_message_ids.each{|message_id| expect(page.all("#message_#{message_id}").count).to eq 1}
 
       visit "/sqs/overview"
 
@@ -165,7 +169,7 @@ RSpec.describe "Mounted in Rails Application", :sqs do
 
       expect(first("#alert").text).to eq "One or more messages may have already been removed or is not visible."
 
-      messages.each{|message| expect(page.all("##{message.message_id}").count).to eq 0}
+      messages.each{|message| expect(page.all("#message_#{message.message_id}").count).to eq 0}
 
       visit "/sqs/overview"
 
@@ -181,7 +185,7 @@ RSpec.describe "Mounted in Rails Application", :sqs do
 
       expect(first("#alert").text).to eq ""
 
-      messages.each{|message| expect(page.all("##{message.message_id}").count).to eq 1}
+      messages.each{|message| expect(page.all("#message_#{message.message_id}").count).to eq 1}
     end
 
     it "should render all information related to the visible messages" do
@@ -198,7 +202,13 @@ RSpec.describe "Mounted in Rails Application", :sqs do
       Message Body Test_0
       EOF
 
-      message_entry = first("##{message.message_id}")
+      message_entry = first("#message_#{message.message_id}")
+      
+      within(message_entry) do 
+        click_on "Toggle full message"
+        first(".toggle_format").click
+      end
+      
       match_content(message_entry, normalize_whitespace(message_metadata))
       match_content(message_entry, normalize_whitespace(message.inspect.to_yaml.split('receipt_handle')[0]))
       match_content(message_entry, normalize_whitespace(message.inspect.to_yaml.split('md5', 2)[1]))
@@ -212,7 +222,7 @@ RSpec.describe "Mounted in Rails Application", :sqs do
 
       message = receive_messages(source_queue_url).messages.first
 
-      expect(first("##{message.message_id}")).to be_nil
+      expect(first("#message_#{message.message_id}")).to be_nil
 
       match_content(page, "Showing 0 visible messages")
     end
@@ -223,13 +233,15 @@ RSpec.describe "Mounted in Rails Application", :sqs do
             
       visit "/sqs/dlq_console"
 
-      within("##{message_id}") do
+      first("#message_#{message_id}").hover
+
+      within("#message_#{message_id}") do
         click_on "Move to Source Queue"
       end
 
       success_message = "Message ID: #{message_id} in Queue #{DLQ_QUEUE_NAME} was successfully moved to Source Queue #{source_queue_url}."
       expect(first("#alert").text).to eq success_message
-      expect(page.all("##{message_id}").count).to eq 0
+      expect(page.all("#message_#{message_id}").count).to eq 0
 
       visit "/sqs/overview"
 
@@ -258,8 +270,8 @@ RSpec.describe "Mounted in Rails Application", :sqs do
 
       expect(first("#alert").text).to eq "Selected messages have been requeued successfully."
 
-      moved_message_ids.each{|message_id| expect(page.all("##{message_id}").count).to eq 0}
-      retained_message_ids.each{|message_id| expect(page.all("##{message_id}").count).to eq 1}
+      moved_message_ids.each{|message_id| expect(page.all("#message_#{message_id}").count).to eq 0}
+      retained_message_ids.each{|message_id| expect(page.all("#message_#{message_id}").count).to eq 1}
 
       visit "/sqs/overview"
 
@@ -296,7 +308,7 @@ RSpec.describe "Mounted in Rails Application", :sqs do
 
       expect(first("#alert").text).to eq "One or more messages may have already been requeued or is not visible."
 
-      messages.each{|message| expect(page.all("##{message.message_id}").count).to eq 0}
+      messages.each{|message| expect(page.all("#message_#{message.message_id}").count).to eq 0}
 
       visit "/sqs/overview"
 
@@ -313,7 +325,21 @@ RSpec.describe "Mounted in Rails Application", :sqs do
 
       expect(first("#alert").text).to eq ""
 
-      messages.each{|message| expect(page.all("##{message.message_id}").count).to eq 1}
+      messages.each{|message| expect(page.all("#message_#{message.message_id}").count).to eq 1}
+    end
+
+    it "should have a select/unselect all function" do
+      messages = generate_messages(dlq_queue_url, 3)
+      
+      visit "/sqs/dlq_console"
+
+      first("#select_all").click
+
+      page.all(".bulk_check").each{|node| expect(node["checked"]).to eq true}
+
+      first("#select_all").click
+
+      page.all(".bulk_check").each{|node| expect(node["checked"]).to eq false}
     end
   end
 

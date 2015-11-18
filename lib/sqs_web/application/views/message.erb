@@ -1,14 +1,20 @@
-<li class="job" id="<%= message.message_id %>">
-  <input type="checkbox" id="batch_action_item_<%= message.message_id %>" value="<%= message.message_id %>/<%= queue[:name] %>" name="message_collection[]"/>
+<li class="job" id="message_<%= message.message_id %>">
+  <input type="checkbox" class="bulk_check" id="batch_action_item_<%= message.message_id %>" value="<%= message.message_id %>/<%= queue[:name] %>" name="message_collection[]" form="bulk_action_form"/>
   <dl>
     <dt>ID</dt>
     <dd>
       <a name="<%= message.message_id %>"></a>
       <a href="#<%= message.message_id %>"><%=h message.message_id %></a>
       <div class="controls">
-        <form action="<%= u("remove/#{queue[:name]}/#{message.message_id}") %>" method="post"><%= csrf_token_tag %><input type="submit" value="Remove"></input></form>
+        <form action="<%= u("remove/#{queue[:name]}/#{message.message_id}") %>" method="post">
+          <%= csrf_token_tag %>
+          <input type="submit" value="Remove" />
+        </form>
         or
-        <form action="<%= u("requeue/#{queue[:name]}/#{message.message_id}") %>" method="post"><%= csrf_token_tag %><input type="submit" value="Move to Source Queue"></input></form>
+        <form action="<%= u("requeue/#{queue[:name]}/#{message.message_id}") %>" method="post">
+          <%= csrf_token_tag %>
+          <input type="submit" value="Move to Source Queue" />
+        </form>
       </div>
     </dd>
     <% if message.attributes["ApproximateReceiveCount"] %>
