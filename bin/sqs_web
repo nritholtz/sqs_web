@@ -1,10 +1,31 @@
 #!/usr/bin/env ruby
 #
+require 'optparse'
+require 'yaml'
 begin
-  require 'sqs_web/application/app.rb'
+  require 'sqs_web'
 rescue LoadError => e
   require 'rubygems'
   path = File.expand_path '../../lib', __FILE__
   $:.unshift(path) if File.directory?(path) && !$:.include?(path)
-  require 'sqs_web/application/app.rb'
+  require 'sqs_web'
 end
+
+options = {}
+OptionParser.new do |opts|
+  opts.banner = "Usage: sqs_web [options]\nExample: sqs_web -p 9424 -e http://localhost:4568 -q TestSourceQueue,TestSourceQueueDLQ -k fake -s fake"
+
+  opts.on('-e ENDPOINT', '--endpoint', 'SQS Endpoint') { |lib| options[:endpoint] = lib }
+
+  opts.on("-q QUEUE1,QUEUE2", "--queues", Array, "Queues to be registered") do |list|
+    options[:queues] = list
+  end
+  opts.on('-k KEY', '--access_key_id', 'AWS Access Key ID') { |lib| options[:access_key_id] = lib }
+  opts.on('-s SECRET', '--secret_access_key', 'AWS Secret Access Key') { |lib| options[:access_key_id] = lib }
+  opts.on('-p PORT', '--port', "Port to run app on: Default 4567") {|lib| options[:port] = lib}
+end.parse!
+SqsWeb.options[:aws][:endpoint] = options[:endpoint]
+SqsWeb.options[:queues] =  options[:queues]
+SqsWeb.options[:aws][:access_key_id] = options[:access_key_id]
+SqsWeb.options[:aws][:secret_access_key] = options[:access_key_id]
+SqsWeb.run!(port: options[:port] || 4567)
