@@ -10,7 +10,7 @@ GIT
 PATH
   remote: .
   specs:
-    sqs_web (0.0.1)
+    sqs_web (0.0.2)
       aws-sdk (~> 2.1.33)
       sinatra (>= 1.4.4)
 
