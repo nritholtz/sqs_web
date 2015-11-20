@@ -10,7 +10,7 @@
   <%= csrf_token_tag %>
   Select/Unselect All <input type="checkbox" id="select_all" />
   <div id="bulk_action_submit">
-    <input type="submit" value="Bulk Remove" action="<%= u("bulk_remove") %>"/>
+    <input class="remove_bulk" type="submit" value="Bulk Remove" action="<%= u("bulk_remove") %>"/>
     <input type="submit" value="Bulk Move to Source Queue" action="<%= u("bulk_requeue") %>"/>
   </div>
 </form> 

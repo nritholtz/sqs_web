@@ -8,7 +8,7 @@
       <div class="controls">
         <form action="<%= u("remove/#{queue[:name]}/#{message.message_id}") %>" method="post">
           <%= csrf_token_tag %>
-          <input type="submit" value="Remove" />
+          <input class="remove_single" type="submit" value="Remove" />
         </form>
         or
         <form action="<%= u("requeue/#{queue[:name]}/#{message.message_id}") %>" method="post">

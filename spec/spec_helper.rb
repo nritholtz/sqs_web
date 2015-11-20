@@ -2,6 +2,7 @@ require "codeclimate-test-reporter"
 require "byebug"
 require 'capybara-webkit'
 require 'capybara/rspec'
+require 'support/shared_context.rb'
 CodeClimate::TestReporter.start
 
 ENV['RACK_ENV'] = 'development'

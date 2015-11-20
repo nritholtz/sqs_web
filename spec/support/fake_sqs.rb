@@ -13,7 +13,7 @@ SqsWeb.options[:aws][:secret_access_key] = "fake"
 SqsWeb.options[:aws][:endpoint] = $fake_sqs.uri
 
 RSpec.configure do |config|
-  config.before(:each, :sqs) { $fake_sqs.start }
+  config.before(:suite) { $fake_sqs.start }
   config.before(:each, :sqs) { $fake_sqs.reset }
   config.after(:suite) { $fake_sqs.stop }
 end
