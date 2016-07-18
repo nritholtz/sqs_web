@@ -24,7 +24,7 @@ Gem::Specification.new do |gem|
   gem.test_files    = gem.files.grep(%r{^(test|spec|features)/})
 
   gem.add_runtime_dependency "sinatra",      [">= 1.4.4"]
-  gem.add_dependency 'aws-sdk', '~> 2.1.33'
+  gem.add_dependency 'aws-sdk', '~> 2'
 
 
   gem.add_development_dependency "rspec"

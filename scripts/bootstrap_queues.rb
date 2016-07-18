@@ -20,6 +20,7 @@ $fake_sqs = FakeSQS::TestIntegration.new(
   sqs_port: 4568,
 )
 $fake_sqs.start
+Aws::SQS::Client.remove_plugin(Aws::Plugins::SQSMd5s)
 sqs = Aws::SQS::Client.new(endpoint: $fake_sqs.uri, region: 'us-east-1', credentials: Aws::Credentials.new("fake", "fake"))
 # Create queues
 source_queue_url = sqs.create_queue(queue_name: "TestSourceQueue").queue_url

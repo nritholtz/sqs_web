@@ -8,6 +8,8 @@ RSpec.shared_context "sqs_setup", :sqs do
 
   Capybara.app = RailsApp
 
+  Aws::SQS::Client.remove_plugin(Aws::Plugins::SQSMd5s)
+
   let(:sqs) { Aws::SQS::Client.new(region: "us-east-1", credentials: Aws::Credentials.new("fake", "fake")) }
 
   let(:source_queue_url) { sqs.get_queue_url(queue_name: SOURCE_QUEUE_NAME).queue_url }

@@ -21,6 +21,8 @@ class SqsAction
     # but only if the configuration options have valid values
     aws_options = aws_options.merge(credentials: credentials) if credentials.set?
 
+    Aws::SQS::Client.remove_plugin(Aws::Plugins::SQSMd5s)
+    
     Aws.config = aws_options
   end
 
