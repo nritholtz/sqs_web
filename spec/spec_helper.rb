@@ -1,6 +1,5 @@
 require "codeclimate-test-reporter"
 require "byebug"
-require 'capybara-webkit'
 require 'capybara/rspec'
 require 'support/shared_context.rb'
 CodeClimate::TestReporter.start
@@ -12,7 +11,7 @@ RSpec.configure do |config|
   config.include Capybara::DSL
 end
 
-Capybara.javascript_driver = :webkit
+Capybara.javascript_driver = :selenium
 
 def match_content(actual, expected)
   actual_text = actual.respond_to?(:text) ? normalize_whitespace(actual.text) : actual

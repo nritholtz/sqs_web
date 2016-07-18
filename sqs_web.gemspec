@@ -32,6 +32,6 @@ Gem::Specification.new do |gem|
   gem.add_development_dependency "capybara"
   gem.add_development_dependency "codeclimate-test-reporter"
   gem.add_development_dependency "byebug"
-  gem.add_development_dependency "capybara-webkit"
+  gem.add_development_dependency "selenium-webdriver"
   #gem.add_development_dependency "fake_sqs",  ["~> 0.3.1"]
 end

@@ -54,11 +54,11 @@ RSpec.describe "DLQ Console", js: true, sqs: true do
 
     first("#select_all").click
 
-    page.all(".bulk_check").each{|node| expect(node["checked"]).to eq true}
+    page.all(".bulk_check").each{|node| expect(node["checked"]).to eq "true"}
 
     first("#select_all").click
 
-    page.all(".bulk_check").each{|node| expect(node["checked"]).to eq false}
+    page.all(".bulk_check").each{|node| expect(node["checked"]).to eq nil}
   end
   
   describe "Remove" do
@@ -71,8 +71,10 @@ RSpec.describe "DLQ Console", js: true, sqs: true do
 
       first("#message_#{deleted_message_id}").hover
 
-      within("#message_#{deleted_message_id}") do
-        click_on "Remove"
+      page.accept_confirm do
+        within("#message_#{deleted_message_id}") do
+          click_on "Remove"
+        end
       end
 
       success_message = "Message ID: #{deleted_message_id} in Queue #{DLQ_QUEUE_NAME} was successfully removed."
@@ -112,8 +114,10 @@ RSpec.describe "DLQ Console", js: true, sqs: true do
 
       first("#message_#{deleted_message_id}").hover
 
-      within("#message_#{deleted_message_id}") do
-        click_on "Remove"
+      page.accept_confirm do
+        within("#message_#{deleted_message_id}") do
+          click_on "Remove"
+        end
       end
       
       error_message = "Message ID: #{deleted_message_id} in Queue #{DLQ_QUEUE_NAME} has already been deleted or is not visible."
@@ -133,7 +137,7 @@ RSpec.describe "DLQ Console", js: true, sqs: true do
         first("#batch_action_item_#{message_id}").set(true)
       end
       
-      click_on "Bulk Remove"
+      page.accept_confirm{click_on "Bulk Remove"}
 
       expect(first("#alert").text).to eq "Selected messages have been removed successfully."
 
@@ -179,7 +183,7 @@ RSpec.describe "DLQ Console", js: true, sqs: true do
         first("#batch_action_item_#{message.message_id}").set(true)
       end
       
-      click_on "Bulk Remove"
+      page.accept_confirm{click_on "Bulk Remove"}
 
       expect(first("#alert").text).to eq "One or more messages may have already been removed or is not visible."
 
@@ -195,9 +199,9 @@ RSpec.describe "DLQ Console", js: true, sqs: true do
       
       visit "/sqs/dlq_console"
 
-      click_on "Bulk Remove"
+      page.accept_confirm{click_on "Bulk Remove"}
 
-      expect(first("#alert").text).to eq ""
+      expect(first("#alert")).to eq nil
 
       messages.each{|message| expect(page.all("#message_#{message.message_id}").count).to eq 1}
     end
@@ -300,7 +304,7 @@ RSpec.describe "DLQ Console", js: true, sqs: true do
 
       click_on "Bulk Move to Source Queue"
 
-      expect(first("#alert").text).to eq ""
+      expect(first("#alert")).to eq nil
 
       messages.each{|message| expect(page.all("#message_#{message.message_id}").count).to eq 1}
     end
