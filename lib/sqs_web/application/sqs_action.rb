@@ -29,7 +29,11 @@ class SqsAction
   def self.load_queue_urls
     sqs && SqsWeb.options[:queues].map do |queue_name|
       dlq_queue_url = sqs.get_queue_url(queue_name: queue_name).queue_url
-      source_queue_url = sqs.list_dead_letter_source_queues({queue_url: dlq_queue_url}).queue_urls.first
+      begin
+        source_queue_url = sqs.list_dead_letter_source_queues({queue_url: dlq_queue_url}).queue_urls.first
+      # ElasticMQ doesn't support 'list_dead_letter_source_queues' yet
+      rescue Aws::SQS::Errors::NotFound
+      end
       {name:  queue_name, url: dlq_queue_url, source_url: source_queue_url}
     end
   end
