@@ -18,6 +18,11 @@ class SqsAction
       aws_options[:access_key_id],
       aws_options[:secret_access_key])
 
+    #Override SQS endpoint
+    environment_endpoint = ENV["AWS_SQS_ENDPOINT"]
+    explicit_endpoint = SqsWeb.options[:aws][:endpoint] || environment_endpoint
+    aws_options[:endpoint] = explicit_endpoint unless explicit_endpoint.to_s.empty?
+    
     # but only if the configuration options have valid values
     aws_options = aws_options.merge(credentials: credentials) if credentials.set?
 

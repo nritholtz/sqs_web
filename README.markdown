@@ -54,10 +54,12 @@ end
 `sqs_web` runs as a Sinatra application within the rails application. Visit it at `/sqs`.
 
 ## Supported SqsWeb configuration options
-`SqsWeb.options[:aws]` supports the following hash key/value pairs:
+The ```aws``` section is used to configure the Aws objects used by sqs_web internally. The sqs_web-specific keys are listed below, and you can expect any other key defined in that block to be passed on untouched to ```Aws::SQS::Client#initialize```:
+
 - `access_key_id` : AWS Access Key. If not set will default to environment variable `AWS_ACCESS_KEY_ID` or instance profile credentials
 - `secret_access_key` : AWS Secret Access Key. If not set will default to environment variable `AWS_SECRET_ACCESS_KEY` or instance profile credentials.
 - `region`: AWS region for the SQS queue. If not set will default to environment variable `AWS_REGION` or else to `us-east-1`.
+- `sqs_endpoint` can be used to explicitly override the SQS endpoint. If not set will default to environment variable `AWS_SQS_ENDPOINT` or default SQS endpoint.
 
 `SqsWeb.options[:queues]` supports an array of strings for the SQS queue names.
 ```ruby
