@@ -1,6 +1,6 @@
 Gem::Specification.new do |gem|
   gem.name        = "sqs_web"
-  gem.version     = "0.0.3"
+  gem.version     = "0.0.4"
   gem.author      = "Nathaniel Ritholtz"
   gem.email       = "nritholtz@gmail.com"
   gem.homepage    = "https://github.com/nritholtz/sqs_web"
