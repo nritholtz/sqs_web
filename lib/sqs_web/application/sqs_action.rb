@@ -3,32 +3,30 @@ class SqsAction
   protected
   
   def self.sqs
-    @@sqs ||= Aws::SQS::Client.new
+    @@sqs ||= Aws::SQS::Client.new(SqsWeb.options[:aws])
   end
 
   def self.initialize_aws
     # aws-sdk tries to load the credentials from the ENV variables: AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY
     # when not explicit supplied
-    return if SqsWeb.options[:aws].empty?
-
     aws_options = SqsWeb.options[:aws]
+
+    return if aws_options.empty?
 
     # assume credentials based authentication
     credentials = Aws::Credentials.new(
       aws_options[:access_key_id],
       aws_options[:secret_access_key])
 
+    # but only if the configuration options have valid values
+    aws_options[:credentials] = credentials if credentials.set?
+
     #Override SQS endpoint
     environment_endpoint = ENV["AWS_SQS_ENDPOINT"]
     explicit_endpoint = SqsWeb.options[:aws][:endpoint] || environment_endpoint
     aws_options[:endpoint] = explicit_endpoint unless explicit_endpoint.to_s.empty?
 
-    # but only if the configuration options have valid values
-    aws_options = aws_options.merge(credentials: credentials) if credentials.set?
-
     Aws::SQS::Client.remove_plugin(Aws::Plugins::SQSMd5s)
-    
-    Aws.config = aws_options
   end
 
   def self.load_queue_urls
@@ -39,7 +37,7 @@ class SqsAction
       rescue Aws::SQS::Errors::NonExistentQueue => e
         raise $!, "#{queue_name} is not an existing queue name" ,$!.backtrace
       end
-      
+
       begin
         source_queue_url = sqs.list_dead_letter_source_queues({queue_url: dlq_queue_url}).queue_urls.first
       # ElasticMQ doesn't support 'list_dead_letter_source_queues' yet
