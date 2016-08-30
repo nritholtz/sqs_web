@@ -31,6 +31,6 @@ RSpec.describe "Overview Page", :sqs do
 
     visit "/sqs/overview"
 
-    match_content(page, "Aws::SQS::Errors::NonExistentQueue: BOGUSQUEUE")
+    match_content(page, "<Aws::SQS::Errors::NonExistentQueue: BOGUSQUEUE is not an existing queue name>: BOGUSQUEUE is not an existing queue name")
   end
 end

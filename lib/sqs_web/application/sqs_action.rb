@@ -22,7 +22,7 @@ class SqsAction
     environment_endpoint = ENV["AWS_SQS_ENDPOINT"]
     explicit_endpoint = SqsWeb.options[:aws][:endpoint] || environment_endpoint
     aws_options[:endpoint] = explicit_endpoint unless explicit_endpoint.to_s.empty?
-    
+
     # but only if the configuration options have valid values
     aws_options = aws_options.merge(credentials: credentials) if credentials.set?
 
@@ -33,7 +33,13 @@ class SqsAction
 
   def self.load_queue_urls
     sqs && SqsWeb.options[:queues].map do |queue_name|
-      dlq_queue_url = sqs.get_queue_url(queue_name: queue_name).queue_url
+      #More helpful error message when queue name does not exist
+      begin
+        dlq_queue_url = sqs.get_queue_url(queue_name: queue_name).queue_url
+      rescue Aws::SQS::Errors::NonExistentQueue => e
+        raise $!, "#{queue_name} is not an existing queue name" ,$!.backtrace
+      end
+      
       begin
         source_queue_url = sqs.list_dead_letter_source_queues({queue_url: dlq_queue_url}).queue_urls.first
       # ElasticMQ doesn't support 'list_dead_letter_source_queues' yet
