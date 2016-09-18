@@ -113,11 +113,12 @@ Releasing a new version
 -----------------------
 
 1. Update the version in `sqs_web.gemspec`
-2. `git commit sqs_web.gemspec` with the following message format:
+2. `bundle install`
+3. `git commit sqs_web.gemspec` with the following message format:
 
         Version x.x.x
 
         Changelog:
         * Some new feature
         * Some new bug fix
-3. `rake release`
+4. `rake release`
